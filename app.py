@@ -7,6 +7,7 @@ import gdown
 import gradio as gr
 import pymupdf
 from PIL import Image
+from pdf2docx import Converter
 
 # Streamlined Categories for Free Tier Performance
 CATEGORY_MAP = {
@@ -15,11 +16,11 @@ CATEGORY_MAP = {
     "Documents": ["pdf", "docx", "doc", "rtf", "odt", "txt"]
 }
 
-# Streamlined Target Options
+# Streamlined Target Options (Restored Document Formats)
 FORMAT_OPTIONS = {
     "Images": ["png", "jpg", "jpeg", "webp", "bmp", "tiff", "tif", "gif", "ico"],
     "Audio": ["mp3", "wav", "aac", "flac", "ogg", "m4a", "wma", "opus"],
-    "Documents": ["txt"] # Focused strictly on fast text extraction
+    "Documents": ["pdf", "docx", "doc", "txt", "rtf", "odt"] 
 }
 
 css = """
@@ -155,7 +156,6 @@ def process_file(local_files, drive_id, category, output_ext):
     try:
         # 1. AUDIO (Fast & Lightweight)
         if category == "Audio":
-            # -vn ensures no video stream is accidentally processed, speeding it up
             command = ["ffmpeg", "-i", input_path, "-vn", final_filename, "-y", "-loglevel", "error"]
             subprocess.run(command, check=True)
             status_log += "✅ Audio converted successfully via FFmpeg.\n"
@@ -177,9 +177,14 @@ def process_file(local_files, drive_id, category, output_ext):
                 image.save(final_filename)
             status_log += f"✅ Image converted to {output_ext.upper()} via Pillow.\n"
 
-        # 3. DOCUMENTS TO TEXT (Fast Extraction)
+        # 3. DOCUMENTS (Restored Full Conversion)
         elif category == "Documents":
-            if input_ext == "pdf" and output_ext == "txt":
+            if input_ext == "pdf" and output_ext in ["doc", "docx"]:
+                cv = Converter(input_path)
+                cv.convert(final_filename)
+                cv.close()
+                status_log += "✅ PDF converted to Word.\n"
+            elif input_ext == "pdf" and output_ext == "txt":
                 pdf_doc = pymupdf.open(input_path)
                 with open(final_filename, "w", encoding="utf-8") as output_file:
                     for page in pdf_doc:
@@ -195,7 +200,7 @@ def process_file(local_files, drive_id, category, output_ext):
                 lo_file = os.path.join(out_dir, f"{base_name}.{output_ext}")
                 if os.path.exists(lo_file) and lo_file != final_filename:
                     shutil.move(lo_file, final_filename)
-                status_log += f"✅ Document text extracted to {output_ext.upper()}.\n"
+                status_log += f"✅ Document converted to {output_ext.upper()}.\n"
 
     except Exception as exc:
         status_log += f"❌ Conversion Error: {exc}\n"
@@ -220,7 +225,7 @@ with gr.Blocks(css=css) as app:
         """
         <div style="text-align: center; margin: 25px 0 15px 0;">
             <h1 style="color: white; font-weight: bold; font-size: 34px;">Universal Media Converter</h1>
-            <p style="color: #adb5bd; font-size: 14px;">Fast, lightweight conversions for Images, Audio, and Text Extraction.</p>
+            <p style="color: #adb5bd; font-size: 14px;">Fast, lightweight conversions for Images, Audio, and Documents.</p>
         </div>
         """
     )
